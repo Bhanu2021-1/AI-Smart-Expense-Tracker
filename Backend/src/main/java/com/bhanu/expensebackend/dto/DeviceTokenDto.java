@@ -4,7 +4,7 @@ import com.bhanu.expensebackend.entity.DeviceToken.SyncStatus;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @Builder
@@ -14,7 +14,7 @@ public class DeviceTokenDto {
     private String androidVersion;
     private String appVersion;
     private SyncStatus syncStatus;
-    private LocalDateTime createdAt;
-    private LocalDateTime lastUsed;
-    private LocalDateTime lastSync;
+    private Instant createdAt;
+    private Instant lastUsed;
+    private Instant lastSync;
 }

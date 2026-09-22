@@ -18,6 +18,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -137,9 +139,9 @@ public class AuthService {
                         .androidVersion(token.getAndroidVersion())
                         .appVersion(token.getAppVersion())
                         .syncStatus(token.getSyncStatus())
-                        .createdAt(token.getCreatedAt())
-                        .lastUsed(token.getLastUsed())
-                        .lastSync(token.getLastSync())
+                        .createdAt(toInstant(token.getCreatedAt()))
+                        .lastUsed(toInstant(token.getLastUsed()))
+                        .lastSync(toInstant(token.getLastSync()))
                         .build())
                 .collect(java.util.stream.Collectors.toList());
     }
@@ -167,8 +169,9 @@ public class AuthService {
         if (request.getSyncStatus() != null) {
             token.setSyncStatus(request.getSyncStatus());
         }
-        token.setLastSync(LocalDateTime.now());
+        token.setLastSync(LocalDateTime.now(ZoneOffset.UTC));
         deviceTokenRepository.save(token);
+        log.info("DEVICE_SYNC_DEBUG: lastSync UTC = {}", token.getLastSync());
     }
 
     public Optional<User> validateDeviceToken(String rawToken) {
@@ -190,6 +193,10 @@ public class AuthService {
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────
+
+    private Instant toInstant(LocalDateTime ldt) {
+        return ldt == null ? null : ldt.toInstant(ZoneOffset.UTC);
+    }
 
     private AuthResponse buildAuthResponse(String token, User user) {
         return AuthResponse.builder()

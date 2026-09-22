@@ -44,6 +44,7 @@ export const ProfilePage = () => {
   const renderRelativeTime = (isoString) => {
     if (!isoString) return 'Never';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return 'Invalid date';
     const now = new Date();
     const diff = Math.floor((now - date) / 1000); // seconds
     if (diff < 60) return 'just now';
