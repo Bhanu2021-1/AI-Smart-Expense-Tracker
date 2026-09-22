@@ -44,7 +44,14 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptions -> exceptions
+                    .authenticationEntryPoint((request, response, authException) -> {
+                        response.sendError(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
+                    })
+            )
             .authorizeHttpRequests(auth -> auth
+                    // Permit Spring Boot's default error handling to avoid 403 on validation failures
+                    .requestMatchers("/error").permitAll()
                     // Public: authentication endpoints
                     .requestMatchers("/api/auth/**").permitAll()
                     // Public: H2 console (local dev only — disable via H2_CONSOLE_ENABLED=false in prod)
