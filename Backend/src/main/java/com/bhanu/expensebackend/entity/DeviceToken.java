@@ -43,12 +43,29 @@ public class DeviceToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /** Updated each time the device uses the token to authenticate. */
     @Column(name = "last_used")
     private LocalDateTime lastUsed;
+
+    @Column(name = "android_version")
+    private String androidVersion;
+
+    @Column(name = "app_version")
+    private String appVersion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sync_status")
+    private SyncStatus syncStatus = SyncStatus.PENDING;
+
+    @Column(name = "last_sync")
+    private LocalDateTime lastSync;
+
+    public enum SyncStatus {
+        ON, OFF, PENDING, ERROR
+    }
 
     @PrePersist
     protected void prePersist() {
         this.createdAt = LocalDateTime.now();
+        if (this.syncStatus == null) this.syncStatus = SyncStatus.PENDING;
     }
 }

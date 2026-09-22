@@ -76,6 +76,28 @@ public class AuthController {
 
         String deviceName = (request != null) ? request.getDeviceName() : null;
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(authService.issueDeviceToken(user, deviceName));
+                .body(authService.issueDeviceToken(user, request));
+    }
+
+    @GetMapping("/devices")
+    public ResponseEntity<java.util.List<DeviceTokenDto>> getDevices(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(authService.getUserDevices(user));
+    }
+
+    @DeleteMapping("/devices/{id}")
+    public ResponseEntity<Void> disconnectDevice(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id) {
+        authService.revokeDevice(user, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/devices/{id}/sync-status")
+    public ResponseEntity<Void> updateSyncStatus(
+            @AuthenticationPrincipal User user,
+            @PathVariable Long id,
+            @RequestBody DeviceSyncStatusRequest request) {
+        authService.updateDeviceSyncStatus(user, id, request);
+        return ResponseEntity.ok().build();
     }
 }

@@ -19,4 +19,6 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
 
     /** List all paired devices for a user (for Profile page in Phase 3). */
     List<DeviceToken> findByUser(User user);
+    
+    List<DeviceToken> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 }

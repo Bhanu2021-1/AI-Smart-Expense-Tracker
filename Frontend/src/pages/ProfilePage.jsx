@@ -1,14 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+import { authApi } from '../api/authApi';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { User, Mail, Shield, Smartphone, LogOut, CheckCircle2, ChevronRight, Settings, Lock } from 'lucide-react';
+import { User, Mail, Shield, Smartphone, LogOut, CheckCircle2, ChevronRight, Settings, Lock, XCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Badge } from '../components/ui/Badge';
 
 export const ProfilePage = () => {
   const { user, logout } = useAuth();
+  const { showToast } = useToast();
+  const [devices, setDevices] = useState([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(true);
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const fetchDevices = async () => {
+    try {
+      setIsLoadingDevices(true);
+      const data = await authApi.getDevices();
+      setDevices(data);
+    } catch (error) {
+      showToast('error', 'Failed to load devices');
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  const handleDisconnect = async (deviceId) => {
+    try {
+      await authApi.disconnectDevice(deviceId);
+      showToast('success', 'Device disconnected');
+      fetchDevices();
+    } catch (error) {
+      showToast('error', 'Failed to disconnect device');
+    }
+  };
+
+  const renderRelativeTime = (isoString) => {
+    if (!isoString) return 'Never';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000); // seconds
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} hr ago`;
+    return `${Math.floor(diff / 86400)} days ago`;
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-16 relative">
@@ -84,23 +126,41 @@ export const ProfilePage = () => {
               </h3>
               <div className="space-y-4">
                 
-                <div className="group flex items-center justify-between p-4 rounded-2xl border border-white/[0.04] bg-surface-100/50 hover:bg-surface-200/80 transition-all cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-inner group-hover:bg-blue-500/20 transition-colors">
-                      <Smartphone className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white tracking-wide">Android SMS Tracker</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                         <p className="text-xs text-neutral-400 uppercase tracking-widest font-semibold">Synced Active</p>
+                {isLoadingDevices ? (
+                  <p className="text-neutral-500 text-sm">Loading devices...</p>
+                ) : devices.length > 0 ? (
+                  devices.map((device) => (
+                    <div key={device.id} className="group flex items-center justify-between p-4 rounded-2xl border border-white/[0.04] bg-surface-100/50 hover:bg-surface-200/80 transition-all cursor-pointer">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-inner group-hover:bg-blue-500/20 transition-colors">
+                          <Smartphone className="w-6 h-6 text-blue-400" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-white tracking-wide">{device.deviceName}</p>
+                          {device.androidVersion && <p className="text-xs text-neutral-500 mb-1">Android {device.androidVersion}</p>}
+                          <div className="flex items-center gap-2 mt-0.5">
+                             <span className={`w-2 h-2 rounded-full ${device.syncStatus === 'ON' || device.syncStatus === 'PENDING' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                             <p className="text-xs text-neutral-400 uppercase tracking-widest font-semibold">
+                               {device.syncStatus === 'ON' ? 'Synced Active' : device.syncStatus}
+                             </p>
+                             <p className="text-xs text-neutral-500 ml-2">Last Sync: {renderRelativeTime(device.lastSync)}</p>
+                          </div>
+                        </div>
                       </div>
+                      <button 
+                        onClick={() => handleDisconnect(device.id)}
+                        className="p-2 text-neutral-500 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-colors"
+                        title="Disconnect Device"
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </button>
                     </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-neutral-500 group-hover:text-white transition-colors" />
-                </div>
+                  ))
+                ) : (
+                  <p className="text-neutral-500 text-sm italic">No connected devices.</p>
+                )}
                 
-                <div className="group flex items-center justify-between p-4 rounded-2xl border border-white/[0.04] bg-surface-100/50 hover:bg-surface-200/80 transition-all cursor-pointer">
+                <div className="group flex items-center justify-between p-4 rounded-2xl border border-white/[0.04] bg-surface-100/50 hover:bg-surface-200/80 transition-all cursor-pointer mt-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl bg-primary-500/10 border border-primary-500/20 flex items-center justify-center shadow-inner group-hover:bg-primary-500/20 transition-colors">
                       <Lock className="w-6 h-6 text-primary-400" />

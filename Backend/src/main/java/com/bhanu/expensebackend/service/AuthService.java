@@ -100,23 +100,22 @@ public class AuthService {
      * The raw token is a concatenation of two UUIDs (stripped of hyphens),
      * giving 256 bits of entropy. The server never sees it again after this call.
      */
-    public DeviceTokenResponse issueDeviceToken(User user, String deviceName) {
-        // 256 bits of cryptographic randomness
+    public DeviceTokenResponse issueDeviceToken(User user, DeviceTokenRequest request) {
         String rawToken = UUID.randomUUID().toString().replace("-", "")
                 + UUID.randomUUID().toString().replace("-", "");
-
         String tokenHash = sha256(rawToken);
 
         DeviceToken deviceToken = DeviceToken.builder()
                 .user(user)
                 .tokenHash(tokenHash)
-                .deviceName(deviceName != null && !deviceName.isBlank()
-                        ? deviceName.trim() : "Android Device")
+                .deviceName(request != null && request.getDeviceName() != null && !request.getDeviceName().isBlank()
+                        ? request.getDeviceName().trim() : "Android Device")
+                .androidVersion(request != null ? request.getAndroidVersion() : null)
+                .appVersion(request != null ? request.getAppVersion() : null)
                 .build();
 
         deviceTokenRepository.save(deviceToken);
-        log.info("Device token issued for user id={}, device='{}'",
-                user.getId(), deviceToken.getDeviceName());
+        log.info("Device token issued for user id={}, device='{}'", user.getId(), deviceToken.getDeviceName());
 
         return DeviceTokenResponse.builder()
                 .token(rawToken)
@@ -125,13 +124,48 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Validates an incoming raw device token from an Android device.
-     * Hashes the token and looks it up in the database.
-     * Updates last_used timestamp on successful validation.
-     *
-     * @return the owning User if valid, empty Optional otherwise.
-     */
+    public java.util.List<DeviceTokenDto> getUserDevices(User user) {
+        return deviceTokenRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(token -> DeviceTokenDto.builder()
+                        .id(token.getId())
+                        .deviceName(token.getDeviceName())
+                        .androidVersion(token.getAndroidVersion())
+                        .appVersion(token.getAppVersion())
+                        .syncStatus(token.getSyncStatus())
+                        .createdAt(token.getCreatedAt())
+                        .lastUsed(token.getLastUsed())
+                        .lastSync(token.getLastSync())
+                        .build())
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    public void revokeDevice(User user, Long deviceId) {
+        DeviceToken token = deviceTokenRepository.findById(deviceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found"));
+
+        if (!token.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found");
+        }
+
+        deviceTokenRepository.delete(token);
+        log.info("Device revoked: id={} for user={}", deviceId, user.getId());
+    }
+
+    public void updateDeviceSyncStatus(User user, Long deviceId, DeviceSyncStatusRequest request) {
+        DeviceToken token = deviceTokenRepository.findById(deviceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found"));
+
+        if (!token.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found");
+        }
+
+        if (request.getSyncStatus() != null) {
+            token.setSyncStatus(request.getSyncStatus());
+        }
+        token.setLastSync(LocalDateTime.now());
+        deviceTokenRepository.save(token);
+    }
+
     public Optional<User> validateDeviceToken(String rawToken) {
         String tokenHash = sha256(rawToken);
         return deviceTokenRepository.findByTokenHash(tokenHash)

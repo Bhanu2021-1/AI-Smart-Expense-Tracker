@@ -20,4 +20,16 @@ export const authApi = {
       method: 'GET',
     });
   },
+
+  getDevices: async () => {
+    return await apiClient('/auth/devices', {
+      method: 'GET',
+    });
+  },
+
+  disconnectDevice: async (deviceId) => {
+    return await apiClient(`/auth/devices/${deviceId}`, {
+      method: 'DELETE',
+    });
+  },
 };

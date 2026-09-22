@@ -7,113 +7,76 @@ import android.provider.Telephony;
 import android.telephony.SmsMessage;
 import android.util.Log;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import androidx.work.Constraints;
+import androidx.work.NetworkType;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkManager;
 
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+import java.time.Instant;
 
 public class SmsReceiver extends BroadcastReceiver {
+    
+    private static final String TAG = "SmsReceiver";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d("SMS_DEBUG", "Receiver Triggered");
+        Log.d(TAG, "Receiver Triggered");
 
         for (SmsMessage msg : Telephony.Sms.Intents.getMessagesFromIntent(intent)) {
-
             String messageBody = msg.getMessageBody();
             String sender = msg.getOriginatingAddress();
+            long timestamp = msg.getTimestampMillis();
 
-            Log.d("SMS_DEBUG", "Sender: " + sender);
-            Log.d("SMS_DEBUG", "Message: " + messageBody);
+            Log.d(TAG, "Sender: " + sender);
+            Log.d(TAG, "Message: " + messageBody);
 
-            if (messageBody != null &&
-                    (messageBody.toLowerCase().contains("debit")
-                            || messageBody.toLowerCase().contains("debited"))) {
-
-                Log.d("SMS_DEBUG", "💰 DEBIT MESSAGE DETECTED!");
-
-                extractAmount(context, messageBody);
-            }
-        }
-    }
-
-    private void extractAmount(Context context, String body) {
-
-
-
-        // Universal Indian bank SMS pattern
-        Pattern pattern = Pattern.compile(
-                "(?:Rs\\.?|INR)?\\s*(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?)\\s*(?:rs|/-)?",
-                Pattern.CASE_INSENSITIVE
-        );
-
-        Matcher matcher = pattern.matcher(body);
-
-        if (matcher.find()) {
-
-            String amount = matcher.group(1);
-            amount = amount.replace(",", "");
-
-            Log.d("SMS_DEBUG", "💵 Amount Found: ₹" + amount);
-            sendToServer(amount);
-
-            try {
+            SmsParser.ParsedSms parsed = SmsParser.parse(messageBody, sender, timestamp);
+            
+            if (parsed != null) {
+                Log.d(TAG, "💰 DEBIT DETECTED! Amount: ₹" + parsed.amount + " Merchant: " + parsed.merchant);
+                
                 DatabaseHelper db = new DatabaseHelper(context);
-                db.insertExpense(amount, "Bank Debit");
-                Log.d("SMS_DEBUG", "Saved to DB Successfully");
-            } catch (Exception e) {
-                Log.d("SMS_DEBUG", "DB Error: " + e.getMessage());
-            }
-
-        } else {
-            Log.d("SMS_DEBUG", "No Amount Found");
-        }
-
-    }
-
-    private void sendToServer(String amount) {
-
-        new Thread(() -> {
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .build();
-
-            try {
-                MediaType JSON =
-                        MediaType.parse("application/json; charset=utf-8");
-
-                String json = "{ \"amount\": " + amount +
-                        ", \"note\": \"Bank Debit\", " +
-                        "\"category\": \"Other\" }";
-
-                Log.d("API_DEBUG", "Sending: " + json);
-
-                RequestBody requestBody =
-                        RequestBody.create(json, JSON);
-
-                Request request = new Request.Builder()
-                        .url("https://expensebackend-nzy9.onrender.com/api/expenses")
-                        .post(requestBody)
-                        .build();
-
-                Response response = client.newCall(request).execute();
-
-                Log.d("API_DEBUG", "HTTP CODE: " + response.code());
-
-                if (response.body() != null) {
-                    Log.d("API_DEBUG", "Response: " + response.body().string());
+                
+                if (db.isSmsDuplicate(parsed.smsHash)) {
+                    Log.d(TAG, "Duplicate SMS ignored. Hash: " + parsed.smsHash);
+                    continue;
+                }
+                
+                // Save to local database as PENDING
+                String isoDate = null;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    isoDate = Instant.ofEpochMilli(timestamp).toString();
+                } else {
+                    isoDate = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+                        .format(new java.util.Date(timestamp));
                 }
 
-            } catch (Exception e) {
-                Log.e("API_DEBUG", "API ERROR: " + e.getClass().getSimpleName()
-                        + " - " + e.getMessage());
+                db.insertExpense(
+                        parsed.amount, 
+                        "Bank Debit via SMS", 
+                        parsed.merchant, 
+                        parsed.category, 
+                        parsed.smsHash, 
+                        isoDate, 
+                        "PENDING"
+                );
+                
+                // Enqueue background sync work
+                enqueueSync(context);
             }
-        }).start();
+        }
+    }
+
+    private void enqueueSync(Context context) {
+        Constraints constraints = new Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build();
+
+        OneTimeWorkRequest syncWork = new OneTimeWorkRequest.Builder(SyncWorker.class)
+                .setConstraints(constraints)
+                .build();
+
+        WorkManager.getInstance(context).enqueue(syncWork);
+        Log.d(TAG, "Sync work enqueued");
     }
 }
