@@ -1,0 +1,30 @@
+# Node
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Java / Maven
+**/target/
+**/*.class
+
+# Android / Gradle
+**/.gradle/
+**/build/
+**/local.properties
+
+# Environment / secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# IDE
+**/.idea/
+**/.vscode/
+**/*.iml
+
+# Logs
+**/*.log
+
+# OS
+.DS_Store
+Thumbs.db
