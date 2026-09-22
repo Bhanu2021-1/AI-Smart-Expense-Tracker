@@ -239,20 +239,28 @@ public class LoginActivity extends AppCompatActivity {
                                     "Device pairing successful."
                             );
 
-                            // Save the device token securely
-                            String rawToken = tokenResponse.getToken();
-                            android.util.Log.d("DEVICE_AUTH_DEBUG", "device token received = " + (rawToken != null));
-                            if (rawToken != null) {
-                                android.util.Log.d("DEVICE_AUTH_DEBUG", "token length = " + rawToken.length());
+                            android.util.Log.d("DEVICE_AUTH_DEBUG", "pairing response received = true");
+                            if (tokenResponse != null) {
+                                android.util.Log.d("DEVICE_AUTH_DEBUG", "pairing device id = " + tokenResponse.getId());
+                                android.util.Log.d("DEVICE_AUTH_DEBUG", "device token received = " + (tokenResponse.getToken() != null));
                             }
                             
-                            sessionManager.saveDeviceToken(rawToken);
-                            android.util.Log.d("DEVICE_AUTH_DEBUG", "token saved = true");
+                            if (tokenResponse != null && tokenResponse.getToken() != null) {
+                                String rawToken = tokenResponse.getToken();
+                                
+                                sessionManager.saveDeviceToken(rawToken);
+                                if (tokenResponse.getId() != null) {
+                                    android.util.Log.d("DEVICE_AUTH_DEBUG", "device id save attempted = " + tokenResponse.getId());
+                                    sessionManager.saveDeviceId(tokenResponse.getId());
+                                    android.util.Log.d("DEVICE_AUTH_DEBUG", "device id read-back = " + sessionManager.getDeviceId());
+                                }
+                                android.util.Log.d("DEVICE_AUTH_DEBUG", "token saved = true");
 
-                            String readBack = sessionManager.getDeviceToken();
-                            android.util.Log.d("DEVICE_AUTH_DEBUG", "token read-back available = " + (readBack != null));
-                            if (readBack != null) {
-                                android.util.Log.d("DEVICE_AUTH_DEBUG", "token read-back length = " + readBack.length());
+                                String readBack = sessionManager.getDeviceToken();
+                                android.util.Log.d("DEVICE_AUTH_DEBUG", "token read-back available = " + (readBack != null && !readBack.isEmpty()));
+                                if (readBack != null) {
+                                    android.util.Log.d("DEVICE_AUTH_DEBUG", "token read-back length = " + readBack.length());
+                                }
                             }
 
                             // We keep the JWT saved so SyncWorker can use it for silent re-pairing if the device token gets revoked

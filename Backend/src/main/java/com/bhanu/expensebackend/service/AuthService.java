@@ -122,6 +122,7 @@ public class AuthService {
         log.info("Device token issued for user id={}, device='{}'", user.getId(), deviceToken.getDeviceName());
 
         return DeviceTokenResponse.builder()
+                .id(deviceToken.getId())
                 .token(rawToken)
                 .deviceName(deviceToken.getDeviceName())
                 .note("Store this token securely on your device. It will not be shown again.")

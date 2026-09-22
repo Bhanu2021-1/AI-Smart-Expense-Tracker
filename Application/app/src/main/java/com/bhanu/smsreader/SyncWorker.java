@@ -55,6 +55,7 @@ public class SyncWorker extends Worker {
             String loadedJwt = sessionManager.getJwt();
             android.util.Log.d("DEVICE_AUTH_DEBUG", "device token available = " + (loadedDeviceToken != null && !loadedDeviceToken.isEmpty()));
             android.util.Log.d("DEVICE_AUTH_DEBUG", "auth header source = " + (loadedDeviceToken != null && !loadedDeviceToken.isEmpty() ? "DEVICE_TOKEN" : (loadedJwt != null && !loadedJwt.isEmpty() ? "JWT" : "NONE")));
+            android.util.Log.d("SYNC_DEBUG", "device id available to worker = " + sessionManager.getDeviceId());
 
             // If not authenticated, fail
             if (loadedDeviceToken == null && loadedJwt == null) {
@@ -64,6 +65,7 @@ public class SyncWorker extends Worker {
 
             Cursor cursor = dbHelper.getPendingExpenses();
             boolean allSuccess = true;
+            boolean atLeastOneSuccess = false;
 
             int count = (cursor != null) ? cursor.getCount() : 0;
             android.util.Log.d("SYNC_DEBUG", "pending expense count = " + count);
@@ -99,6 +101,7 @@ public class SyncWorker extends Worker {
                             // 409 means it was already synced (idempotent success)
                             dbHelper.updateSyncStatus(id, "SYNCED");
                             android.util.Log.d("SYNC_DEBUG", "expense synced successfully");
+                            atLeastOneSuccess = true;
                         } else if (response.code() == 401 || response.code() == 403) {
                             android.util.Log.e("SYNC_DEBUG", "Authentication failed. Device token revoked or invalid.");
                             
@@ -118,6 +121,11 @@ public class SyncWorker extends Worker {
                                 if (repairRes.isSuccessful() && repairRes.body() != null) {
                                     android.util.Log.d("SYNC_DEBUG", "Silent re-pair successful");
                                     sessionManager.saveDeviceToken(repairRes.body().getToken());
+                                    if (repairRes.body().getId() != null) {
+                                        android.util.Log.d("DEVICE_AUTH_DEBUG", "new device id from silent re-pair = " + repairRes.body().getId());
+                                        sessionManager.saveDeviceId(repairRes.body().getId());
+                                        android.util.Log.d("DEVICE_AUTH_DEBUG", "new device id read-back = " + sessionManager.getDeviceId());
+                                    }
                                     
                                     // Retry the expense sync
                                     android.util.Log.d("SYNC_DEBUG", "API request started");
@@ -127,6 +135,7 @@ public class SyncWorker extends Worker {
                                     if (response.isSuccessful() || response.code() == 409) {
                                         dbHelper.updateSyncStatus(id, "SYNCED");
                                         android.util.Log.d("SYNC_DEBUG", "expense synced successfully");
+                                        atLeastOneSuccess = true;
                                         continue;
                                     }
                                 } else {
@@ -147,6 +156,34 @@ public class SyncWorker extends Worker {
                     }
                 } while (cursor.moveToNext());
                 cursor.close();
+            }
+
+            android.util.Log.d("SYNC_DEBUG", "atLeastOneSuccess = " + atLeastOneSuccess);
+            android.util.Log.d("SYNC_DEBUG", "attempting device status update");
+
+            if (atLeastOneSuccess) {
+                Long deviceId = sessionManager.getDeviceId();
+                if (deviceId != null) {
+                    android.util.Log.d("SYNC_DEBUG", "stored device id = " + deviceId);
+                    try {
+                        android.util.Log.d("SYNC_DEBUG", "device sync-status update started");
+                        
+                        com.bhanu.smsreader.models.DeviceSyncStatusRequest req = new com.bhanu.smsreader.models.DeviceSyncStatusRequest("SYNCED");
+                        retrofit2.Response<Void> statusResponse = authApi.updateSyncStatus(deviceId, req).execute();
+                        
+                        android.util.Log.d("SYNC_DEBUG", "device sync-status response = " + statusResponse.code());
+                        if (statusResponse.isSuccessful()) {
+                            android.util.Log.d("SYNC_DEBUG", "device sync-status updated successfully");
+                        } else {
+                            android.util.Log.d("SYNC_DEBUG", "device sync-status update failed = " + statusResponse.message());
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.d("SYNC_DEBUG", "device sync-status update exception");
+                        e.printStackTrace();
+                    }
+                } else {
+                    android.util.Log.d("SYNC_DEBUG", "device id missing; cannot update sync status");
+                }
             }
 
             android.util.Log.d("SYNC_DEBUG", "SyncWorker finished");

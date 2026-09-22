@@ -12,6 +12,11 @@ import lombok.NoArgsConstructor;
 public class DeviceTokenResponse {
 
     /**
+     * The device ID to be used for future operations like sync-status updates.
+     */
+    private Long id;
+
+    /**
      * The raw device token to store securely on the Android device.
      *
      * SECURITY NOTE: This is the ONLY time the raw token will be visible.

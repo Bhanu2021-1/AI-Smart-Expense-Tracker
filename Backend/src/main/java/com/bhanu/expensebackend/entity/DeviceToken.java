@@ -60,7 +60,7 @@ public class DeviceToken {
     private LocalDateTime lastSync;
 
     public enum SyncStatus {
-        ON, OFF, PENDING, ERROR
+        ON, OFF, PENDING, ERROR, SYNCED
     }
 
     @PrePersist

@@ -139,9 +139,9 @@ export const ProfilePage = () => {
                           <p className="font-semibold text-white tracking-wide">{device.deviceName}</p>
                           {device.androidVersion && <p className="text-xs text-neutral-500 mb-1">Android {device.androidVersion}</p>}
                           <div className="flex items-center gap-2 mt-0.5">
-                             <span className={`w-2 h-2 rounded-full ${device.syncStatus === 'ON' || device.syncStatus === 'PENDING' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                             <span className={`w-2 h-2 rounded-full ${device.syncStatus === 'SYNCED' || device.syncStatus === 'PENDING' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                              <p className="text-xs text-neutral-400 uppercase tracking-widest font-semibold">
-                               {device.syncStatus === 'ON' ? 'Synced Active' : device.syncStatus}
+                               {device.syncStatus === 'SYNCED' ? 'Synced Active' : device.syncStatus}
                              </p>
                              <p className="text-xs text-neutral-500 ml-2">Last Sync: {renderRelativeTime(device.lastSync)}</p>
                           </div>

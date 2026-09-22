@@ -15,6 +15,7 @@ public class SessionManager {
     private static final String KEY_JWT = "jwt_token";
     private static final String KEY_DEVICE_TOKEN = "device_token";
     private static final String KEY_USER_NAME = "user_name";
+    private static final String KEY_DEVICE_ID = "device_id";
 
     private static SessionManager instance;
     private final SharedPreferences sharedPreferences;
@@ -58,6 +59,15 @@ public class SessionManager {
 
     public String getDeviceToken() {
         return sharedPreferences.getString(KEY_DEVICE_TOKEN, null);
+    }
+
+    public void saveDeviceId(Long deviceId) {
+        sharedPreferences.edit().putLong(KEY_DEVICE_ID, deviceId).apply();
+    }
+
+    public Long getDeviceId() {
+        long id = sharedPreferences.getLong(KEY_DEVICE_ID, -1L);
+        return id == -1L ? null : id;
     }
 
     public void saveUserName(String name) {
