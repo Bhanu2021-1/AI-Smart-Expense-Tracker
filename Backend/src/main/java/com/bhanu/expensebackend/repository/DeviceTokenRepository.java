@@ -15,6 +15,7 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
      * Look up a device by the SHA-256 hash of its raw token.
      * Used by JwtAuthFilter to authenticate Android SMS requests.
      */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "user")
     Optional<DeviceToken> findByTokenHash(String tokenHash);
 
     /** List all paired devices for a user (for Profile page in Phase 3). */

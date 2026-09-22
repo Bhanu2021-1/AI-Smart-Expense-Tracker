@@ -64,32 +64,61 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7).trim();
+        log.info("DEVICE_AUTH_DEBUG: credential length = {}", token.length());
 
         try {
+            boolean authenticated = false;
             if (isJwtFormat(token)) {
-                authenticateWithJwt(token, request);
+                log.info("DEVICE_AUTH_DEBUG: credential classification = JWT");
+                authenticated = authenticateWithJwt(token, request);
+                if (!authenticated) {
+                    log.info("DEVICE_AUTH_DEBUG: JWT validation failed; attempting device-token validation");
+                    authenticated = authenticateWithDeviceToken(token, request);
+                }
             } else {
-                authenticateWithDeviceToken(token, request);
+                log.info("DEVICE_AUTH_DEBUG: credential classification = DEVICE_TOKEN");
+                authenticated = authenticateWithDeviceToken(token, request);
+            }
+            log.info("DEVICE_AUTH_DEBUG: authentication created = {}", authenticated);
+            if (authenticated) {
+                log.info("DEVICE_AUTH_DEBUG: SecurityContext authenticated = true");
+                Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                log.info("DEVICE_AUTH_DEBUG: principal type = {}", principal.getClass().getSimpleName());
+                if (principal instanceof User) {
+                    log.info("DEVICE_AUTH_DEBUG: principal user id = {}", ((User) principal).getId());
+                }
+            } else {
+                log.info("DEVICE_AUTH_DEBUG: SecurityContext authenticated = false");
             }
         } catch (Exception e) {
             // Do not propagate — let Spring Security return 401
             log.warn("Authentication attempt failed for {} {}", request.getMethod(), request.getRequestURI());
+            log.info("DEVICE_AUTH_DEBUG: JwtAuthFilter authentication exception type = {}", e.getClass().getName());
+            log.info("DEVICE_AUTH_DEBUG: JwtAuthFilter authentication message = {}", e.getMessage());
+            log.info("DEVICE_AUTH_DEBUG: authentication created = false");
+            log.info("DEVICE_AUTH_DEBUG: SecurityContext authenticated = false");
         }
 
         chain.doFilter(request, response);
     }
 
-    private void authenticateWithJwt(String token, HttpServletRequest request) {
-        if (!jwtUtil.isTokenValid(token)) return;
+    private boolean authenticateWithJwt(String token, HttpServletRequest request) {
+        if (!jwtUtil.isTokenValid(token)) return false;
 
         Long userId = jwtUtil.extractUserId(token);
-        userRepository.findById(userId)
-                .ifPresent(user -> setAuthentication(user, request));
+        return userRepository.findById(userId)
+                .map(user -> {
+                    setAuthentication(user, request);
+                    return true;
+                }).orElse(false);
     }
 
-    private void authenticateWithDeviceToken(String token, HttpServletRequest request) {
-        authService.validateDeviceToken(token)
-                .ifPresent(user -> setAuthentication(user, request));
+    private boolean authenticateWithDeviceToken(String token, HttpServletRequest request) {
+        return authService.validateDeviceToken(token)
+                .map(user -> {
+                    setAuthentication(user, request);
+                    return true;
+                }).orElse(false);
     }
 
     private void setAuthentication(User user, HttpServletRequest request) {

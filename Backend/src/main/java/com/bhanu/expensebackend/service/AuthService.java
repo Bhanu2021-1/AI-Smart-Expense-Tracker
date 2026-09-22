@@ -105,6 +105,10 @@ public class AuthService {
                 + UUID.randomUUID().toString().replace("-", "");
         String tokenHash = sha256(rawToken);
 
+        log.info("DEVICE_AUTH_DEBUG: issuing new device token");
+        log.info("DEVICE_AUTH_DEBUG: generated token length = {}", rawToken.length());
+        log.info("DEVICE_AUTH_DEBUG: generated hash = {}", tokenHash);
+
         DeviceToken deviceToken = DeviceToken.builder()
                 .user(user)
                 .tokenHash(tokenHash)
@@ -168,12 +172,20 @@ public class AuthService {
 
     public Optional<User> validateDeviceToken(String rawToken) {
         String tokenHash = sha256(rawToken);
-        return deviceTokenRepository.findByTokenHash(tokenHash)
-                .map(deviceToken -> {
-                    deviceToken.setLastUsed(LocalDateTime.now());
-                    deviceTokenRepository.save(deviceToken);
-                    return deviceToken.getUser();
-                });
+        log.info("DEVICE_AUTH_DEBUG: device token hash computed = true");
+
+        Optional<DeviceToken> optDevice = deviceTokenRepository.findByTokenHash(tokenHash);
+        log.info("DEVICE_AUTH_DEBUG: device token record found = {}", optDevice.isPresent());
+
+        return optDevice.map(deviceToken -> {
+            log.info("DEVICE_AUTH_DEBUG: device token revoked = {}", (deviceToken.getSyncStatus() == DeviceToken.SyncStatus.OFF));
+            log.info("DEVICE_AUTH_DEBUG: device token expired = false");
+            log.info("DEVICE_AUTH_DEBUG: device user id = {}", deviceToken.getUser().getId());
+
+            deviceToken.setLastUsed(LocalDateTime.now());
+            deviceTokenRepository.save(deviceToken);
+            return deviceToken.getUser();
+        });
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────

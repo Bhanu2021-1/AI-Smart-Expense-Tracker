@@ -16,16 +16,17 @@ public class SessionManager {
     private static final String KEY_DEVICE_TOKEN = "device_token";
     private static final String KEY_USER_NAME = "user_name";
 
+    private static SessionManager instance;
     private final SharedPreferences sharedPreferences;
 
-    public SessionManager(Context context) {
+    private SessionManager(Context context) {
         try {
             MasterKey masterKey = new MasterKey.Builder(context)
                     .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
                     .build();
 
             sharedPreferences = EncryptedSharedPreferences.create(
-                    context,
+                    context.getApplicationContext(),
                     PREF_NAME,
                     masterKey,
                     EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
@@ -34,6 +35,13 @@ public class SessionManager {
         } catch (GeneralSecurityException | IOException e) {
             throw new RuntimeException("Could not initialize secure storage", e);
         }
+    }
+
+    public static synchronized SessionManager getInstance(Context context) {
+        if (instance == null) {
+            instance = new SessionManager(context.getApplicationContext());
+        }
+        return instance;
     }
 
     public void saveJwt(String jwt) {

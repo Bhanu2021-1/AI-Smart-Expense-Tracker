@@ -18,7 +18,7 @@ public class RetrofitClient {
 
     public static Retrofit getClient(Context context) {
         if (retrofit == null) {
-            SessionManager sessionManager = new SessionManager(context);
+            SessionManager sessionManager = SessionManager.getInstance(context);
 
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(30, TimeUnit.SECONDS)
@@ -33,9 +33,13 @@ public class RetrofitClient {
                         String jwt = sessionManager.getJwt();
                         
                         if (deviceToken != null && !deviceToken.isEmpty()) {
+                            android.util.Log.d("DEVICE_AUTH_DEBUG", "Authorization header source = DEVICE_TOKEN");
                             requestBuilder.header("Authorization", "Bearer " + deviceToken);
                         } else if (jwt != null && !jwt.isEmpty()) {
+                            android.util.Log.d("DEVICE_AUTH_DEBUG", "Authorization header source = JWT");
                             requestBuilder.header("Authorization", "Bearer " + jwt);
+                        } else {
+                            android.util.Log.d("DEVICE_AUTH_DEBUG", "Authorization header source = NONE");
                         }
 
                         Request request = requestBuilder.build();

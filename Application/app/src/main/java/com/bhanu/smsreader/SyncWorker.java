@@ -22,87 +22,143 @@ import retrofit2.Response;
 public class SyncWorker extends Worker {
 
     private static final String TAG = "SyncWorker";
-    private final DatabaseHelper dbHelper;
-    private final ExpenseApi expenseApi;
-    private final AuthApi authApi;
-    private final SessionManager sessionManager;
+    private DatabaseHelper dbHelper;
+    private ExpenseApi expenseApi;
+    private AuthApi authApi;
+    private SessionManager sessionManager;
 
     public SyncWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
-        dbHelper = new DatabaseHelper(context);
-        expenseApi = RetrofitClient.getClient(context).create(ExpenseApi.class);
-        authApi = RetrofitClient.getClient(context).create(AuthApi.class);
-        sessionManager = new SessionManager(context);
+        try {
+            dbHelper = new DatabaseHelper(context);
+            expenseApi = RetrofitClient.getClient(context).create(ExpenseApi.class);
+            authApi = RetrofitClient.getClient(context).create(AuthApi.class);
+            sessionManager = SessionManager.getInstance(context);
+        } catch (Exception e) {
+            android.util.Log.e("SYNC_DEBUG", "SyncWorker constructor crashed", e);
+        }
     }
 
     @NonNull
     @Override
     public Result doWork() {
-        Log.d(TAG, "Starting sync work...");
-        
-        // If not authenticated, fail
-        if (sessionManager.getDeviceToken() == null && sessionManager.getJwt() == null) {
-            Log.e(TAG, "No authentication token found. Aborting sync.");
-            return Result.failure();
-        }
+        try {
+            android.util.Log.d("SYNC_DEBUG", "SyncWorker.doWork() ENTERED");
+            android.util.Log.d("SYNC_DEBUG", "worker started");
+            
+            if (dbHelper == null || expenseApi == null || sessionManager == null) {
+                android.util.Log.e("SYNC_DEBUG", "SyncWorker dependencies not initialized. Aborting.");
+                return Result.failure();
+            }
 
-        Cursor cursor = dbHelper.getPendingExpenses();
-        boolean allSuccess = true;
+            String loadedDeviceToken = sessionManager.getDeviceToken();
+            String loadedJwt = sessionManager.getJwt();
+            android.util.Log.d("DEVICE_AUTH_DEBUG", "device token available = " + (loadedDeviceToken != null && !loadedDeviceToken.isEmpty()));
+            android.util.Log.d("DEVICE_AUTH_DEBUG", "auth header source = " + (loadedDeviceToken != null && !loadedDeviceToken.isEmpty() ? "DEVICE_TOKEN" : (loadedJwt != null && !loadedJwt.isEmpty() ? "JWT" : "NONE")));
 
-        if (cursor != null && cursor.moveToFirst()) {
-            do {
-                long id = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ID));
-                String amount = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_AMOUNT));
-                String note = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_NOTE));
-                String merchant = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_MERCHANT));
-                String category = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CATEGORY));
-                String smsHash = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SMS_HASH));
-                String date = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_DATE));
+            // If not authenticated, fail
+            if (loadedDeviceToken == null && loadedJwt == null) {
+                android.util.Log.e("SYNC_DEBUG", "No authentication token found. Aborting sync.");
+                return Result.failure();
+            }
 
-                ExpenseDto dto = new ExpenseDto(
-                        new BigDecimal(amount),
-                        note,
-                        category,
-                        merchant,
-                        "SMS",
-                        smsHash,
-                        date
-                );
+            Cursor cursor = dbHelper.getPendingExpenses();
+            boolean allSuccess = true;
 
-                try {
-                    Response<ExpenseDto> response = expenseApi.createExpense(dto).execute();
-                    if (response.isSuccessful() || response.code() == 409) {
-                        // 409 means it was already synced (idempotent success)
-                        dbHelper.updateSyncStatus(id, "SYNCED");
-                        Log.d(TAG, "Successfully synced expense: " + id);
-                    } else if (response.code() == 401 || response.code() == 403) {
-                        Log.e(TAG, "Authentication failed. Device token revoked or invalid.");
-                        sessionManager.clearSession();
-                        return Result.failure(); // Permanent failure
-                    } else {
-                        Log.e(TAG, "Failed to sync expense: " + response.code());
+            int count = (cursor != null) ? cursor.getCount() : 0;
+            android.util.Log.d("SYNC_DEBUG", "pending expense count = " + count);
+
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    long id = cursor.getLong(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_ID));
+                    android.util.Log.d("SYNC_DEBUG", "processing expense id = " + id);
+                    
+                    String amount = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_AMOUNT));
+                    String note = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_NOTE));
+                    String merchant = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_MERCHANT));
+                    String category = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CATEGORY));
+                    String smsHash = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SMS_HASH));
+                    String date = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_DATE));
+
+                    ExpenseDto dto = new ExpenseDto(
+                            new BigDecimal(amount),
+                            note,
+                            category,
+                            merchant,
+                            "SMS",
+                            smsHash,
+                            date
+                    );
+
+                    try {
+                        android.util.Log.d("SYNC_DEBUG", "API request started");
+                        Response<ExpenseDto> response = expenseApi.createExpense(dto).execute();
+                        android.util.Log.d("SYNC_DEBUG", "API response code = " + response.code());
+                        
+                        if (response.isSuccessful() || response.code() == 409) {
+                            // 409 means it was already synced (idempotent success)
+                            dbHelper.updateSyncStatus(id, "SYNCED");
+                            android.util.Log.d("SYNC_DEBUG", "expense synced successfully");
+                        } else if (response.code() == 401 || response.code() == 403) {
+                            android.util.Log.e("SYNC_DEBUG", "Authentication failed. Device token revoked or invalid.");
+                            
+                            String jwt = sessionManager.getJwt();
+                            if (jwt != null && !jwt.isEmpty()) {
+                                android.util.Log.d("SYNC_DEBUG", "Attempting silent re-pair using JWT");
+                                // Temporarily remove device token so interceptor uses JWT
+                                sessionManager.saveDeviceToken(null);
+                                
+                                com.bhanu.smsreader.models.DeviceTokenRequest repairReq = new com.bhanu.smsreader.models.DeviceTokenRequest(
+                                    android.os.Build.MODEL,
+                                    android.os.Build.VERSION.RELEASE,
+                                    "1.0"
+                                );
+                                
+                                retrofit2.Response<com.bhanu.smsreader.models.DeviceTokenResponse> repairRes = authApi.issueDeviceToken(repairReq).execute();
+                                if (repairRes.isSuccessful() && repairRes.body() != null) {
+                                    android.util.Log.d("SYNC_DEBUG", "Silent re-pair successful");
+                                    sessionManager.saveDeviceToken(repairRes.body().getToken());
+                                    
+                                    // Retry the expense sync
+                                    android.util.Log.d("SYNC_DEBUG", "API request started");
+                                    response = expenseApi.createExpense(dto).execute();
+                                    android.util.Log.d("SYNC_DEBUG", "API response code = " + response.code());
+                                    
+                                    if (response.isSuccessful() || response.code() == 409) {
+                                        dbHelper.updateSyncStatus(id, "SYNCED");
+                                        android.util.Log.d("SYNC_DEBUG", "expense synced successfully");
+                                        continue;
+                                    }
+                                } else {
+                                    android.util.Log.e("SYNC_DEBUG", "Silent re-pair failed: " + repairRes.code());
+                                }
+                            }
+                            
+                            android.util.Log.e("SYNC_DEBUG", "Permanent auth failure. Needs explicit login.");
+                            sessionManager.clearSession();
+                            return Result.failure(); // Permanent failure
+                        } else {
+                            android.util.Log.e("SYNC_DEBUG", "Failed to sync expense: " + response.code());
+                            allSuccess = false;
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("SYNC_DEBUG", "Network error syncing expense: " + e.getMessage());
                         allSuccess = false;
                     }
-                } catch (Exception e) {
-                    Log.e(TAG, "Network error syncing expense: " + e.getMessage());
-                    allSuccess = false;
-                }
-            } while (cursor.moveToNext());
-            cursor.close();
-        }
+                } while (cursor.moveToNext());
+                cursor.close();
+            }
 
-        // Notify backend of last sync status if successful
-        // NOTE: Actually we don't have device ID locally, but we can do it if needed. 
-        // For now, the user uses JWT or device token. If we need to send PATCH, we need the device ID.
-        // Wait, if we use the Device Token as Auth, the backend can extract it! 
-        // But our PATCH endpoint requires {id}. We should probably change the PATCH endpoint to infer ID from the token,
-        // or just let the backend update lastSync implicitly when validating the token.
-        // In AuthService.java, we updated `validateDeviceToken` to update `lastUsed`.
-        
-        if (allSuccess) {
-            return Result.success();
-        } else {
-            return Result.retry();
+            android.util.Log.d("SYNC_DEBUG", "SyncWorker finished");
+
+            if (allSuccess) {
+                return Result.success();
+            } else {
+                return Result.retry();
+            }
+        } catch (Exception e) {
+            android.util.Log.e("SYNC_DEBUG", "SyncWorker failed", e);
+            return Result.failure();
         }
     }
 }

@@ -27,8 +27,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        sessionManager = new SessionManager(this);
+        // Initialize auth API and session
+        sessionManager = SessionManager.getInstance(this);
         if (sessionManager.getDeviceToken() == null) {
             startActivity(new Intent(this, LoginActivity.class));
             finish();
@@ -54,8 +54,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void requestSmsPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED) {
+            int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.RECEIVE_SMS);
+            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                android.util.Log.d("SMS_DEBUG", "RECEIVE_SMS permission = DENIED (Requesting now)");
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECEIVE_SMS}, SMS_PERMISSION_CODE);
+            } else {
+                android.util.Log.d("SMS_DEBUG", "RECEIVE_SMS permission = GRANTED");
             }
         }
     }
@@ -64,8 +68,10 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == SMS_PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            android.util.Log.d("SMS_DEBUG", "RECEIVE_SMS permission = GRANTED (After prompt)");
             Toast.makeText(this, "SMS Permission Granted", Toast.LENGTH_SHORT).show();
         } else {
+            android.util.Log.d("SMS_DEBUG", "RECEIVE_SMS permission = DENIED (After prompt)");
             Toast.makeText(this, "SMS Permission is required to sync expenses", Toast.LENGTH_LONG).show();
         }
     }

@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "expenses.db";
-    private static final int DB_VERSION = 2; // Incremented for Phase 4 schema changes
+    private static final int DB_VERSION = 3; // Incremented for SQLite migration fix
 
     private static final String TABLE_NAME = "expenses";
     
@@ -35,22 +35,35 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                 + COL_NOTE + " TEXT,"
                 + COL_MERCHANT + " TEXT,"
                 + COL_CATEGORY + " TEXT,"
-                + COL_SMS_HASH + " TEXT UNIQUE,"
+                + COL_SMS_HASH + " TEXT,"
                 + COL_SYNC_STATUS + " TEXT,"
                 + COL_DATE + " TEXT"
                 + ")";
         db.execSQL(CREATE_TABLE);
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_sms_hash ON " + TABLE_NAME + "(" + COL_SMS_HASH + ")");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
         if (oldVersion < 2) {
-            // Migration: Add new columns to existing table
-            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_MERCHANT + " TEXT");
-            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_CATEGORY + " TEXT");
-            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_SMS_HASH + " TEXT UNIQUE");
-            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_SYNC_STATUS + " TEXT DEFAULT 'PENDING'");
-            db.execSQL("ALTER TABLE " + TABLE_NAME + " ADD COLUMN " + COL_DATE + " TEXT");
+            // SQLite ALTER TABLE cannot add UNIQUE constraint directly.
+            addColumnSafely(db, TABLE_NAME, COL_MERCHANT, "TEXT");
+            addColumnSafely(db, TABLE_NAME, COL_CATEGORY, "TEXT");
+            addColumnSafely(db, TABLE_NAME, COL_SMS_HASH, "TEXT"); // UNIQUE removed
+            addColumnSafely(db, TABLE_NAME, COL_SYNC_STATUS, "TEXT DEFAULT 'PENDING'");
+            addColumnSafely(db, TABLE_NAME, COL_DATE, "TEXT");
+        }
+        
+        if (oldVersion < 3) {
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_sms_hash ON " + TABLE_NAME + "(" + COL_SMS_HASH + ")");
+        }
+    }
+
+    private void addColumnSafely(SQLiteDatabase db, String table, String column, String type) {
+        try {
+            db.execSQL("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
+        } catch (Exception e) {
+            android.util.Log.e("DB_MIGRATION", "Column might already exist: " + column, e);
         }
     }
 
