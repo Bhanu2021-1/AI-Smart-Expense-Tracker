@@ -12,10 +12,11 @@ public class ExpenseDto {
     private String referenceId;
     private String smsHash;
     private String date;
+    private String transactionType;
 
     public ExpenseDto() {}
 
-    public ExpenseDto(BigDecimal amount, String note, String category, String merchant, String source, String smsHash, String date) {
+    public ExpenseDto(BigDecimal amount, String note, String category, String merchant, String source, String smsHash, String date, String transactionType) {
         this.amount = amount;
         this.note = note;
         this.category = category;
@@ -23,6 +24,7 @@ public class ExpenseDto {
         this.source = source;
         this.smsHash = smsHash;
         this.date = date;
+        this.transactionType = transactionType;
     }
 
     public Long getId() { return id; }
@@ -33,4 +35,5 @@ public class ExpenseDto {
     public String getSource() { return source; }
     public String getSmsHash() { return smsHash; }
     public String getDate() { return date; }
+    public String getTransactionType() { return transactionType; }
 }

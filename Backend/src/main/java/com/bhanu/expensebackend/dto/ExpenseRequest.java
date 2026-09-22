@@ -1,11 +1,12 @@
 package com.bhanu.expensebackend.dto;
 
 import com.bhanu.expensebackend.entity.ExpenseSource;
+import com.bhanu.expensebackend.entity.TransactionType;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Request body for creating or updating an expense.
@@ -44,9 +45,12 @@ public class ExpenseRequest {
     /** Bank/UPI reference number parsed from the SMS, if available. */
     private String referenceId;
 
+    /** Transaction direction: DEBIT or CREDIT */
+    private TransactionType transactionType;
+
     /**
      * Transaction timestamp.
      * If null, the server defaults to the current time (@PrePersist).
      */
-    private LocalDateTime date;
+    private Instant date;
 }

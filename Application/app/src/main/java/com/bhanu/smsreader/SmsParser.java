@@ -23,8 +23,21 @@ public class SmsParser {
         if (body == null) return null;
         
         String lowerBody = body.toLowerCase();
-        if (!lowerBody.contains("debit") && !lowerBody.contains("debited") && !lowerBody.contains("spent")) {
-            return null; // Not an expense
+        
+        String direction = "UNKNOWN";
+        if (lowerBody.contains("credited") || lowerBody.contains("credit") || 
+            lowerBody.contains("deposited") || lowerBody.contains("received") || 
+            lowerBody.contains("amount credited") || lowerBody.contains("a/c credited") ||
+            lowerBody.contains("added")) {
+            direction = "CREDIT";
+        } else if (lowerBody.contains("debit") || lowerBody.contains("debited") || 
+                   lowerBody.contains("withdrawn") || lowerBody.contains("spent") || 
+                   lowerBody.contains("amount debited") || lowerBody.contains("paid")) {
+            direction = "DEBIT";
+        }
+
+        if (direction.equals("UNKNOWN")) {
+            return null; // Not an expense or income
         }
 
         Matcher amountMatcher = AMOUNT_PATTERN.matcher(body);
@@ -46,7 +59,9 @@ public class SmsParser {
         
         String smsHash = generateHash(body + timestamp);
 
-        return new ParsedSms(amountStr, merchant, category, smsHash, lowerBody);
+        android.util.Log.d("SMS_DEBUG", "transaction direction = " + direction);
+
+        return new ParsedSms(amountStr, merchant, category, smsHash, lowerBody, direction);
     }
 
     private static String categorizeMerchant(String merchant) {
@@ -82,13 +97,15 @@ public class SmsParser {
         public final String category;
         public final String smsHash;
         public final String originalBody;
+        public final String transactionType;
 
-        public ParsedSms(String amount, String merchant, String category, String smsHash, String originalBody) {
+        public ParsedSms(String amount, String merchant, String category, String smsHash, String originalBody, String transactionType) {
             this.amount = amount;
             this.merchant = merchant;
             this.category = category;
             this.smsHash = smsHash;
             this.originalBody = originalBody;
+            this.transactionType = transactionType;
         }
     }
 }

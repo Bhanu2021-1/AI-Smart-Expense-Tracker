@@ -67,6 +67,10 @@ public class Expense {
     @Column(name = "reference_id")
     private String referenceId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transaction_type")
+    private TransactionType transactionType;
+
     private LocalDateTime date;
 
     @PrePersist
@@ -78,6 +82,10 @@ public class Expense {
         // Default source to MANUAL for new rows; existing rows keep null (handled in service)
         if (this.source == null) {
             this.source = ExpenseSource.MANUAL;
+        }
+        // Default transactionType to DEBIT for migration safety
+        if (this.transactionType == null) {
+            this.transactionType = TransactionType.DEBIT;
         }
     }
 }

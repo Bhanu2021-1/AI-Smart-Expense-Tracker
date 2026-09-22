@@ -1,12 +1,13 @@
 package com.bhanu.expensebackend.dto;
 
 import com.bhanu.expensebackend.entity.ExpenseSource;
+import com.bhanu.expensebackend.entity.TransactionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * API response for a single expense.
@@ -30,5 +31,6 @@ public class ExpenseResponse {
     private String merchant;
     private ExpenseSource source;
     private String referenceId;
-    private LocalDateTime date;
+    private TransactionType transactionType;
+    private Instant date;
 }

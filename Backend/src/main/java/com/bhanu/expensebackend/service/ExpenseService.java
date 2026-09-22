@@ -12,7 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -92,9 +94,12 @@ public class ExpenseService {
         expense.setCategory(normalizeCategory(request.getCategory()));
         expense.setMerchant(request.getMerchant());
         expense.setSource(request.getSource() != null ? request.getSource() : ExpenseSource.MANUAL);
+        expense.setTransactionType(request.getTransactionType() != null ? request.getTransactionType() : com.bhanu.expensebackend.entity.TransactionType.DEBIT);
         expense.setSmsHash(request.getSmsHash());
         expense.setReferenceId(request.getReferenceId());
-        expense.setDate(request.getDate()); // @PrePersist defaults to now if null
+        if (request.getDate() != null) {
+            expense.setDate(LocalDateTime.ofInstant(request.getDate(), ZoneOffset.UTC));
+        }
 
         Expense saved = expenseRepository.save(expense);
         log.debug("Expense created: id={}, user={}, amount={}", saved.getId(), user.getId(), saved.getAmount());
@@ -112,7 +117,8 @@ public class ExpenseService {
         if (request.getNote() != null)     expense.setNote(request.getNote());
         if (request.getCategory() != null) expense.setCategory(normalizeCategory(request.getCategory()));
         if (request.getMerchant() != null) expense.setMerchant(request.getMerchant());
-        if (request.getDate() != null)     expense.setDate(request.getDate());
+        if (request.getTransactionType() != null) expense.setTransactionType(request.getTransactionType());
+        if (request.getDate() != null)     expense.setDate(LocalDateTime.ofInstant(request.getDate(), ZoneOffset.UTC));
 
         return toResponse(expenseRepository.save(expense));
     }
@@ -160,7 +166,8 @@ public class ExpenseService {
                 // Existing rows (before auth) may have null source — treat as MANUAL
                 .source(expense.getSource() != null ? expense.getSource() : ExpenseSource.MANUAL)
                 .referenceId(expense.getReferenceId())
-                .date(expense.getDate())
+                .transactionType(expense.getTransactionType() != null ? expense.getTransactionType() : com.bhanu.expensebackend.entity.TransactionType.DEBIT)
+                .date(expense.getDate() != null ? expense.getDate().toInstant(ZoneOffset.UTC) : null)
                 .build();
     }
 }

@@ -81,6 +81,7 @@ public class SyncWorker extends Worker {
                     String category = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_CATEGORY));
                     String smsHash = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_SMS_HASH));
                     String date = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_DATE));
+                    String transactionType = cursor.getString(cursor.getColumnIndexOrThrow(DatabaseHelper.COL_TRANSACTION_TYPE));
 
                     ExpenseDto dto = new ExpenseDto(
                             new BigDecimal(amount),
@@ -89,7 +90,8 @@ public class SyncWorker extends Worker {
                             merchant,
                             "SMS",
                             smsHash,
-                            date
+                            date,
+                            transactionType
                     );
 
                     try {

@@ -39,10 +39,16 @@ export const DashboardPage = () => {
 
   // Compute stats
   const stats = useMemo(() => {
-    const today = expenses.filter(e => isToday(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
-    const thisWeek = expenses.filter(e => isThisWeek(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
-    const thisMonth = expenses.filter(e => isThisMonth(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
-    const prevMonth = expenses.filter(e => {
+    const debitExpenses = expenses.filter(e => e.transactionType !== 'CREDIT');
+    const creditExpenses = expenses.filter(e => e.transactionType === 'CREDIT');
+
+    const today = debitExpenses.filter(e => isToday(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
+    const thisWeek = debitExpenses.filter(e => isThisWeek(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
+    const thisMonth = debitExpenses.filter(e => isThisMonth(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
+    
+    const incomeThisMonth = creditExpenses.filter(e => isThisMonth(parseISO(e.date))).reduce((sum, e) => sum + e.amount, 0);
+
+    const prevMonth = debitExpenses.filter(e => {
        const date = parseISO(e.date);
        const lastMonth = subMonths(new Date(), 1);
        return date.getMonth() === lastMonth.getMonth() && date.getFullYear() === lastMonth.getFullYear();
@@ -50,7 +56,7 @@ export const DashboardPage = () => {
 
     const trend = prevMonth === 0 ? 0 : ((thisMonth - prevMonth) / prevMonth) * 100;
     
-    return { today, thisWeek, thisMonth, prevMonth, trend };
+    return { today, thisWeek, thisMonth, prevMonth, trend, incomeThisMonth, totalCount: expenses.length };
   }, [expenses]);
 
   // Chart data
@@ -62,7 +68,7 @@ export const DashboardPage = () => {
       d.setDate(d.getDate() - i);
       const dateStr = format(d, 'MMM dd');
       const amount = expenses
-        .filter(e => format(parseISO(e.date), 'MMM dd') === dateStr)
+        .filter(e => e.transactionType !== 'CREDIT' && format(parseISO(e.date), 'MMM dd') === dateStr)
         .reduce((sum, e) => sum + e.amount, 0);
       data.push({ date: dateStr, amount });
     }
@@ -142,8 +148,8 @@ export const DashboardPage = () => {
             {[
               { label: 'Today', value: stats.today },
               { label: 'This Week', value: stats.thisWeek },
-              { label: 'Avg/Day', value: stats.thisMonth / (new Date().getDate() || 1) },
-              { label: 'Total Txs', value: expenses.length }
+              { label: 'Income (Mo)', value: stats.incomeThisMonth },
+              { label: 'Total Txs', value: stats.totalCount }
             ].map((stat, i) => (
               <motion.div
                 key={stat.label}
@@ -267,7 +273,9 @@ export const DashboardPage = () => {
           <div className="space-y-6 p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0 w-full">
              <div className="flex flex-col items-center justify-center py-6 bg-surface-200/30 rounded-2xl border border-white/5">
                 <p className="text-sm font-semibold uppercase tracking-widest text-neutral-500 mb-2">Amount</p>
-                <p className="text-4xl font-bold text-white">₹{selectedExpense.amount.toLocaleString()}</p>
+                <p className={`text-4xl font-bold ${selectedExpense.transactionType === 'CREDIT' ? 'text-emerald-400' : 'text-white'}`}>
+                  {selectedExpense.transactionType === 'CREDIT' ? '+' : ''}₹{selectedExpense.amount.toLocaleString()}
+                </p>
              </div>
              <div className="space-y-4">
                 <div className="flex justify-between py-3 border-b border-white/5">
@@ -285,6 +293,12 @@ export const DashboardPage = () => {
                 <div className="flex justify-between py-3 border-b border-white/5">
                    <span className="text-neutral-400">Merchant</span>
                    <span className="text-white font-medium">{selectedExpense.merchant || '-'}</span>
+                </div>
+                <div className="flex justify-between py-3 border-b border-white/5">
+                   <span className="text-neutral-400">Type</span>
+                   <span className={`font-medium ${selectedExpense.transactionType === 'CREDIT' ? 'text-emerald-400' : 'text-white'}`}>
+                     {selectedExpense.transactionType === 'CREDIT' ? 'Credit / Income' : 'Debit / Expense'}
+                   </span>
                 </div>
                 <div className="flex justify-between py-3">
                    <span className="text-neutral-400">Source</span>

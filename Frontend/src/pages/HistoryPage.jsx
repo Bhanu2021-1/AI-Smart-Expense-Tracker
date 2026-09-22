@@ -109,9 +109,13 @@ export const HistoryPage = () => {
     const groups = {};
     filteredExpenses.forEach(exp => {
       const dateStr = format(parseISO(exp.date), 'yyyy-MM-dd');
-      if (!groups[dateStr]) groups[dateStr] = { date: dateStr, total: 0, items: [] };
+      if (!groups[dateStr]) groups[dateStr] = { date: dateStr, totalDebit: 0, totalCredit: 0, items: [] };
       groups[dateStr].items.push(exp);
-      groups[dateStr].total += exp.amount;
+      if (exp.transactionType === 'CREDIT') {
+        groups[dateStr].totalCredit += exp.amount;
+      } else {
+        groups[dateStr].totalDebit += exp.amount;
+      }
     });
     return groups;
   }, [filteredExpenses]);
@@ -242,7 +246,12 @@ export const HistoryPage = () => {
                     </div>
                     
                     <div className="text-right">
-                      <p className="text-base font-bold text-white">₹{group.total.toLocaleString()}</p>
+                      <p className="text-base font-bold text-white">
+                        {group.totalDebit > 0 ? `₹${group.totalDebit.toLocaleString()} spent` : ''}
+                        {group.totalDebit > 0 && group.totalCredit > 0 ? ' • ' : ''}
+                        {group.totalCredit > 0 ? <span className="text-emerald-400">+₹{group.totalCredit.toLocaleString()} income</span> : ''}
+                        {group.totalDebit === 0 && group.totalCredit === 0 ? '₹0' : ''}
+                      </p>
                       <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">{group.items.length} transaction{group.items.length > 1 ? 's' : ''}</p>
                     </div>
                   </div>
@@ -268,11 +277,11 @@ export const HistoryPage = () => {
                           <div className="relative flex items-center justify-between p-4 sm:p-5 rounded-2xl bg-surface-100/60 border border-white/[0.04] group-hover:border-primary-500/20 group-hover:bg-surface-200/80 transition-all duration-300 shadow-sm hover:shadow-lg">
                             
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-xl bg-surface-300/40 border border-white/5 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+                              <div className={`w-12 h-12 rounded-xl bg-surface-300/40 border border-white/5 flex items-center justify-center shrink-0 shadow-inner group-hover:scale-105 transition-transform`}>
                                 {exp.source === 'SMS' ? (
-                                  <Smartphone className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]" />
+                                  <Smartphone className={`w-5 h-5 ${exp.transactionType === 'CREDIT' ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.5)]'}`} />
                                 ) : (
-                                  <Tag className="w-5 h-5 text-primary-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                  <Tag className={`w-5 h-5 ${exp.transactionType === 'CREDIT' ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-primary-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]'}`} />
                                 )}
                               </div>
                               <div>
@@ -299,8 +308,8 @@ export const HistoryPage = () => {
                             </div>
                             
                             <div className="flex flex-col items-end gap-1 relative z-10">
-                              <p className="font-bold text-white text-lg tracking-tight">
-                                ₹{exp.amount.toLocaleString()}
+                              <p className={`font-bold text-lg tracking-tight ${exp.transactionType === 'CREDIT' ? 'text-emerald-400' : 'text-white'}`}>
+                                {exp.transactionType === 'CREDIT' ? '+' : ''}₹{exp.amount.toLocaleString()}
                               </p>
                               <div className="flex items-center justify-end gap-2 sm:gap-4 mt-1">
                                 <Badge variant="secondary" className="hidden sm:inline-flex bg-transparent border-none p-0 text-[10px] text-neutral-500 hover:bg-transparent shadow-none">

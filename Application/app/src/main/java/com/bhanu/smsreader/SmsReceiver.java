@@ -76,7 +76,8 @@ public class SmsReceiver extends BroadcastReceiver {
                             parsed.category, 
                             parsed.smsHash, 
                             isoDate, 
-                            "PENDING"
+                            "PENDING",
+                            parsed.transactionType
                     );
                     
                     Log.d("SMS_DEBUG", "local expense saved = " + (id != -1));
